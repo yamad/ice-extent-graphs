@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# merge monthly ice extent data files
+
+# extract table from file
+#
+# raw data files are in tabular format, but also may have
+# leading/trailing comments. these comments are not marked, so we need
+# to extract the table.
+strip_comments () {
+    # use awk to find the number of columns in the table
+    #
+    # we find the table by counting columns for each line of
+    # input. the table is the section of the document that has the
+    # largest number of lines, all with the same number of columns.
+    #
+    # assume one table per file. tabular (space-delimited) format
+
+    ncol=`awk -f maxcount_fieldnum.awk ${1}` # get column count
+
+    awk 'NF == nc' nc=$ncol ${1}             # print only lines that
+                                             # have correct column
+                                             # count
+}
+
+
+
+# create temporary work file (see Classic Shell Scripting by Robbins)
+umask 077
+TMPFILE=`mktemp -t clean_data.XXXXXXXXXXXX`
+
+# merge files
+i=0
+for fname in $@
+do
+    if [ $i -eq 0 ]; then
+        strip_comments $fname > ${TMPFILE}
+    else
+        strip_comments $fname | awk 'NR != 1' >> ${TMPFILE}
+    fi
+    i=$((i+1))
+done
+
+sort --key=1,2 --numeric-sort ${TMPFILE}
+
+trap 'rm -f $TMPFILE' EXIT      # remove temporary file, no matter what

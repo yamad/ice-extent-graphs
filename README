@@ -1,0 +1,8 @@
+# Graphs from Sea Ice Extent v2 data
+
+from NSIDC (National Snow and Ice Data Center), https://nsidc.org/data/docs/noaa/g02135_seaice_index
+
+Use bash shell script `prepare_data` to get and prepare the data files. This
+automatically calls the helper scripts `download_data` and `clean_data` to
+generate data files for R. The Rmarkdown file `extent.Rmd` holds the R
+commands that display the data (using ggplot2).

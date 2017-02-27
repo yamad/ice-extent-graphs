@@ -1,0 +1,272 @@
+---
+title: "Ice Extent"
+author: "Jason Yamada-Hanff"
+date: "December 6, 2016"
+output: html_document
+---
+
+```{r doc_setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup}
+setwd("~/src/pico/ice_extent")
+library(tidyverse)
+library(magrittr)
+library(lubridate)
+library(readr)
+```
+
+# Making graphs from Sea Ice Extent v2 data
+
+from NSIDC (National Snow and Ice Data Center), https://nsidc.org/data/docs/noaa/g02135_seaice_index
+
+Use bash shell script `prepare_data` to get and prepare the data files. Uses helpers `download_data` and `clean_data` to get and prep data to generate the data files used here.
+
+Monthly averages for ice extent going back to end of 1978 until today (2016):
+
+```{r ingest_monthy_data}
+month.nh <- read_table("data/N_full_area_v2.txt") # northern pole (arctic), monthly averages
+month.sh <- read_table("data/S_full_area_v2.txt") # southern pole (antarctic), monthly averages
+
+# missing values are marked as -9999
+month.nh[] <- lapply(month.nh, function(x) { x[x == -9999] <- NA; x; })
+month.sh[] <- lapply(month.sh, function(x) { x[x == -9999] <- NA; x; })
+
+month.nh %<>% rename(month=mo)
+month.sh %<>% rename(month=mo)
+
+# get global values, sum north/south extent
+month.all <- rbind(month.nh, month.sh) %>% 
+  group_by(year, month) %>% 
+  summarise(region="all", extent=sum(extent))
+```
+
+Daily points for ice extent
+
+```{r ingest_daily_data}
+day.past.nh <- read_table("data/NH_daily_final.clean.txt")
+day.curr.nh <- read_table("data/NH_daily_nrt.clean.txt")
+names(day.past.nh) %<>% tolower
+names(day.curr.nh) %<>% tolower
+day.past.nh$region <- "N"
+day.curr.nh$region <- "N"
+day.nh <- rbind(day.past.nh, day.curr.nh) %>%
+  mutate(date=make_date(year, month, day))
+
+day.past.sh <- read_table("data/SH_daily_final.clean.txt")
+day.curr.sh <- read_table("data/SH_daily_nrt.clean.txt")
+names(day.past.sh) %<>% tolower
+names(day.curr.sh) %<>% tolower
+day.past.sh$region <- "N"
+day.curr.sh$region <- "N"
+day.sh <- rbind(day.past.sh, day.curr.sh) %>%
+  mutate(date=make_date(year, month, day))
+
+day.all <- rbind(day.nh, day.sh) %>% 
+  group_by(year, month, day) %>% 
+  summarise(date=date[1], region="all", extent=sum(extent))
+```
+
+```{r setup_global_plot}
+df <- month.all
+ymin <- min(df$extent, na.rm=TRUE)
+ymax <- max(df$extent, na.rm=TRUE)
+
+png("global_extent.png", width=1000, height=600)
+plot(1,1,ylim=c(ymin, 29.5), xlim=c(1,12), xlab="", ylab="", bty='n', axes=F)
+par(cex=0.85)
+axis(1, at=c(1,4,8,12), label=c("Jan", "Apr", "Aug", "Dec"), tick=T, family="serif")
+axis(2, at=seq(16,28,2), label=seq(16,28,2), tick=F, las=2, family="serif")
+
+abline(h=28, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=26, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=24, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=22, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=20, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=18, col=rgb(0.9,0.9,0.9), lwd=0.5)
+
+text(1.2, 29, "Global ice extent\nin millions of square kilometers", adj=0, family="serif")
+
+text(8.4, 27.5, "1978-2015", family="serif")
+
+lapply(unique(df$year), function(yr) {
+  if (yr == 2016) return       # skip 2016, treated specially later
+  dyr <- df[df$year == yr,]
+  lines(dyr$month, dyr$extent, col=rgb(0.4,0.4,0.4,0.3))
+})
+
+dyr <- df[df$year == 2016,]
+lines(dyr$month, dyr$extent, lwd=2.5, col="#C04032")
+text(10.2, dyr$extent[dyr$month == 10]+0.6, "2016", family="serif", adj=0)
+
+dev.off() 
+```
+
+```{r setup_arctic_plot}
+df <- month.nh
+ymin <- min(df$extent, na.rm=TRUE)
+ymax <- max(df$extent, na.rm=TRUE)
+
+jpeg("arctic_extent.jpg", width=1000, height=600)
+plot(1,1,ylim=c(ymin, ymax), xlim=c(1,12), xlab="", ylab="", bty='n', axes=F)
+par(cex=0.85)
+axis(1, at=c(1,4,8,12), label=c("Jan", "Apr", "Aug", "Dec"), tick=T, family="serif")
+axis(2, at=seq(ymin,ymax,2), label=seq(ymin,ymax,2), tick=F, las=2, family="serif")
+
+# abline(h=28, col=rgb(0.9,0.9,0.9), lwd=0.5)
+# abline(h=26, col=rgb(0.9,0.9,0.9), lwd=0.5)
+# abline(h=24, col=rgb(0.9,0.9,0.9), lwd=0.5)
+# abline(h=22, col=rgb(0.9,0.9,0.9), lwd=0.5)
+# abline(h=20, col=rgb(0.9,0.9,0.9), lwd=0.5)
+# abline(h=18, col=rgb(0.9,0.9,0.9), lwd=0.5)
+
+text(1.2, 29, "Arctic ice extent\nin millions of square kilometers", adj=0, family="serif")
+
+text(8.4, 27.5, "1978-2015", family="serif")
+
+lapply(unique(df$year), function(yr) {
+  if (yr == 2016) return       # skip 2016, treated specially later
+  dyr <- df[df$year == yr,]
+  lines(dyr$month, dyr$extent, col=rgb(0.4,0.4,0.4,0.3))
+})
+
+dyr <- df[df$year == 2016,]
+lines(dyr$month, dyr$extent, lwd=2.5, col="#C04032")
+text(10.2, dyr$extent[dyr$month == 10]+0.6, "2016", family="serif", adj=0)
+
+dev.off()
+```
+
+```{r plot_daily_global}
+df <- day.all
+ymin <- min(df$extent, na.rm=TRUE)
+ymax <- max(df$extent, na.rm=TRUE)
+
+pdf("extent_daily_global.pdf", width=10, height=6)
+plot(1,1,ylim=c(16, 29), xlim=c(0,365), xlab="", ylab="", bty='n', axes=F)
+par(cex=0.85)
+axis(1, at=c(0,100,200,300,365), tick=T, family="serif")
+axis(2, at=seq(14,30,2), label=seq(14,30,2), tick=F, las=2, family="serif")
+
+abline(h=28, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=26, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=24, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=22, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=20, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=18, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=16, col=rgb(0.9,0.9,0.9), lwd=0.5)
+
+text(1.2, ymax-1, "Global ice extent,\nin millions of\nsquare kilometers", adj=0, family="serif")
+
+text(235, 28, "1978-2015", family="serif")
+
+graylevel=0.8
+weight=1
+for (yr in seq(1979,2015,5)) {
+#lapply(unique(df$year), function(yr) {
+  #if (yr == 2016)        # skip 2016, treated specially later
+  dyr <- df[df$year == yr,]
+  lines(yday(dyr$date), dyr$extent, col=rgb(graylevel,graylevel,graylevel,1), lwd=weight)
+  graylevel = graylevel - 0.1
+  #weight = weight + 0.5
+}
+
+dyr <- df[df$year == 2016,]
+lines(yday(dyr$date), dyr$extent, lwd=8, col="#C04032")
+text(yday(dyr$date[length(dyr$date)])-10, dyr$extent[length(dyr$extent)]-1, "2016", family="serif", adj=0)
+
+# 1979
+# dyr <- df[df$year == 2015,]
+# lines(yday(dyr$date), dyr$extent, lwd=2.5, col="#000000")
+
+# 2015
+#dyr <- df[df$year == 2010,]
+#lines(yday(dyr$date), dyr$extent, lwd=2.5, col="#00ff00")
+
+dev.off()
+```
+
+```{r plot_daily_arctic}
+df <- day.nh
+ymin <- min(df$extent, na.rm=TRUE)
+ymax <- max(df$extent, na.rm=TRUE)
+
+pdf("extent_daily_arctic.pdf", width=10, height=6)
+plot(-1,-1,ylim=c(0, 17), xlim=c(0,365), xlab="", ylab="", bty='n', axes=F)
+par(cex=0.85)
+axis(1, at=c(0,100,200,300,365), tick=T, family="serif")
+axis(2, at=seq(2,16,4), tick=F, las=2, family="serif")
+
+abline(h=14, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=10, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=6, col=rgb(0.9,0.9,0.9), lwd=0.5)
+abline(h=2, col=rgb(0.9,0.9,0.9), lwd=0.5)
+
+text(1.2, ymin, "Arctic ice extent,\nin millions of\nsquare kilometers", adj=0, family="serif")
+
+text(250, 11, "1978-2015", family="serif")
+
+lapply(unique(df$year), function(yr) {
+  if (yr == 2016) return       # skip 2016, treated specially later
+  dyr <- df[df$year == yr,]
+  lines(yday(dyr$date), dyr$extent, col=rgb(0.4,0.4,0.4,0.3))
+})
+
+dyr <- df[df$year == 2016,]
+lines(yday(dyr$date), dyr$extent, lwd=2.5, col="#C04032")
+text(yday(dyr$date[length(dyr$date)])+10, dyr$extent[length(dyr$extent)], "2016", family="serif", adj=0)
+
+dev.off()
+```
+
+```{r extent_daily_antarctic_plot}
+df <- day.sh
+
+look <- theme(panel.background = element_blank(),
+              axis.title = element_blank(),
+              axis.ticks = element_blank(),
+              panel.grid = element_blank(),
+              panel.grid.major.y = element_line(color=rgb(0.9,0.9,0.9))
+)
+
+daily_plot <- function(df) {
+  ggplot(df, aes(x=yday(date), y=extent)) +
+    geom_line(aes(group=year), color=rgb(0.4,0.4,0.4), alpha=0.3) +
+    geom_smooth() + 
+    geom_line(aes(x=yday(date), y=extent), data=df[df$year == 2016,], color="#C04032", size=1) +
+    scale_x_continuous(limits=c(1,365), breaks=c(1,91,182,274,365), labels=c("Jan", "Apr", "Jul", "Oct", "Dec 31"))
+}
+
+p <- daily_plot(day.sh) + look
+p <- p + 
+  geom_text(aes(label="1978-2015", x=250, y=11, family="serif"))
+print(p)
+
+# pdf("extent_daily_antarctic.pdf", width=10, height=6)
+# plot(-1,-1,ylim=c(0, 17), xlim=c(0,365), xlab="", ylab="", bty='n', axes=F)
+# par(cex=0.85)
+# axis(1, at=c(0,100,200,300,365), tick=T, family="serif")
+# axis(2, at=seq(2,16,4), tick=F, las=2, family="serif")
+# 
+# abline(h=14, col=rgb(0.9,0.9,0.9), lwd=0.5)
+# abline(h=10, col=rgb(0.9,0.9,0.9), lwd=0.5)
+# abline(h=6, col=rgb(0.9,0.9,0.9), lwd=0.5)
+# abline(h=2, col=rgb(0.9,0.9,0.9), lwd=0.5)
+# 
+# text(1.2, ymin, "Antarctic ice extent,\nin millions of\nsquare kilometers", adj=0, family="serif")
+# 
+# text(250, 11, "1978-2015", family="serif")
+# 
+# lapply(unique(df$year), function(yr) {
+#   if (yr == 2016) return       # skip 2016, treated specially later
+#   dyr <- df[df$year == yr,]
+#   lines(yday(dyr$date), dyr$extent, col=rgb(0.4,0.4,0.4,0.3))
+# })
+# 
+# dyr <- df[df$year == 2016,]
+# lines(yday(dyr$date), dyr$extent, lwd=2.5, col="#C04032")
+# text(yday(dyr$date[length(dyr$date)])+10, dyr$extent[length(dyr$extent)], "2016", family="serif", adj=0)
+
+#dev.off()
+```

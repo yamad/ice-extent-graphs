@@ -1,0 +1,14 @@
+#!/bin/bash
+
+clean_daily_data () {
+    awk 'NR != 2 { print $1 $2 $3 $4 $5 }' FS="," $1
+}
+
+./download_data
+./clean_data data/N_*_area_v2.txt > data/N_full_area_v2.txt
+./clean_data data/S_*_area_v2.txt > data/S_full_area_v2.txt
+
+clean_daily_data data/NH_seaice_extent_final_v2.csv > data/NH_daily_final.clean.txt
+clean_daily_data data/NH_seaice_extent_nrt_v2.csv > data/NH_daily_nrt.clean.txt
+clean_daily_data data/SH_seaice_extent_final_v2.csv > data/SH_daily_final.clean.txt
+clean_daily_data data/SH_seaice_extent_nrt_v2.csv > data/SH_daily_nrt.clean.txt

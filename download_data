@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# download raw data for Sea Ice Extent v2 for artic/antarctic
+# from NSIDC (National Snow and Ice Data Center)
+# https://nsidc.org/data/docs/noaa/g02135_seaice_index
+
+months=( Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec )
+startyear=1978
+stopyear=2016
+baseurl=ftp://sidads.colorado.edu/DATASETS/NOAA/G02135
+DATADIR=data
+
+dl_file () {
+    src=$1
+    dst=$2
+    echo $src
+    if [ ! -f $dst ]; then
+        curl $src -o $dst
+    else
+        echo "   exists"
+    fi
+}
+
+download_readme () {
+    dl_file $baseurl/README.txt $DATADIR/README.txt
+}
+
+download_northpole_extents () {
+    # urls: ftp://sidads.colorado.edu/DATASETS/NOAA/GO2135/<MONTH>/N_<MO>_area_v2.txt
+    for mi in {01..12}           # iterate months
+    do
+        moname=${months[$mi-1]}
+        fname=$(printf "N_%02d_area_v2.txt" $mi) # make left zero-pad with printf
+        src=$baseurl/$moname/$fname
+        dl_file $src $DATADIR/$fname
+    done
+}
+
+download_southpole_extents () {
+    # urls: ftp://sidads.colorado.edu/DATASETS/NOAA/GO2135/<MONTH>/S_<MO>_area_v2.txt
+    for mi in {01..12}           # iterate months
+    do
+        moname=${months[$mi-1]}
+        fname=$(printf "S_%02d_area_v2.txt" $mi) # make left zero-pad with printf
+        src=$baseurl/$moname/$fname
+        dl_file $src $DATADIR/$fname
+    done
+}
+
+download_median_shapefiles () {
+    for mi in {01..12}
+    do
+        moname=${months[$mi-1]}
+        MNname=$(printf "median_N_%02d_1981_2010_polyline_v2.zip" $mi)
+        MSname=$(printf "median_S_%02d_1981_2010_polyline_v2.zip" $mi)
+        MNsrc=$baseurl/shapefiles/$moname/shp_median/$MNname
+        MSsrc=$baseurl/shapefiles/$moname/shp_median/$MSname
+        dl_file $MNsrc $DATADIR/$MNname
+        dl_file $MSsrc $DATADIR/$MSname
+    done
+}
+
+download_year_shapefiles () {
+    for mi in {01..12}
+    do
+        moname=${months[$mi-1]}
+        yr=$startyear
+        while [ $yr -le $stopyear ]
+        do
+            Nname=$(printf "extent_N_%04d%02d_polyline_v2.zip" $yr $mi)
+            Nsrc=$baseurl/shapefiles/$moname/shp_extent/$Nname
+
+            Sname=$(printf "extent_S_%04d%02d_polyline_v2.zip" $yr $mi)
+            Ssrc=$baseurl/shapefiles/$moname/shp_extent/$Sname
+
+            dl_file $Nsrc $DATADIR/$Nname
+            dl_file $Ssrc $DATADIR/$Sname
+
+            yr=$(($yr+1))
+        done
+    done
+}
+
+mkdir $DATADIR
+download_readme
+# monthly average files
+download_northpole_extents
+download_southpole_extents
+
+#download_median_shapefiles
+#download_year_shapefiles
+
+# daily files
+dl_file $baseurl/north/daily/data/NH_seaice_extent_final_v2.csv $DATADIR/NH_seaice_extent_final_v2.csv
+dl_file $baseurl/north/daily/data/NH_seaice_extent_nrt_v2.csv $DATADIR/NH_seaice_extent_nrt_v2.csv
+dl_file $baseurl/south/daily/data/SH_seaice_extent_final_v2.csv $DATADIR/SH_seaice_extent_final_v2.csv
+dl_file $baseurl/south/daily/data/SH_seaice_extent_nrt_v2.csv $DATADIR/SH_seaice_extent_nrt_v2.csv
